@@ -1,6 +1,6 @@
 "use strict";
 
-import QueueDownloads from './queueDownloads.js'
+import DownloadQueue from './downloadQueue.js'
 import Download from './download.js'
 import Debug from './debugger.js'
 
@@ -25,7 +25,7 @@ function Downloader(files = [], options = {}){
     this.options = Object.assign(this.options, options);
 
     //Data Structures
-    this.downloadQueue = new QueueDownloads(this.options.timeBetweenRequests);
+    this.downloadQueue = new DownloadQueue(this.options.timeBetweenRequests);
     this.urlsMap = new Map(); //Access the downloads via the md5 of the url
     this.downloads = []; //Fast array access the downloads
 
@@ -322,6 +322,7 @@ Downloader.prototype.writeDownloaderFile = function(last = false){
 
     //Only perform the last write
     let filename = this.options.downloaderFileLoc;
+
     this.fileSystemDebug(`Writing downloader JSON File to ${filename}.`);
 
     let json = {
@@ -367,7 +368,7 @@ Downloader.prototype.createDownloads = function(urls){
 //Update the download file and add additional meta data
 Downloader.prototype.finish = function(properties = {}){
     if(!this.finished){
-        this.infoOut('Finalized Tasks');
+        this.successOut('Finalized Tasks');
         this.finished = true;
         this.downloadingInProgress = false;
 
@@ -433,12 +434,17 @@ Downloader.prototype.downloadedHandler = function(status, download, filecontents
 Downloader.prototype.shouldDownload = function(download){
     if(download.isDownloading()){
         this.infoOut(`The file ${download.url} is in the process of being downloaded.`);
+        this.checkIfFinished();
         return false; 
     }
 
     if(download.isDownloaded()){
         this.infoOut(`The file ${download.url} is already downloaded.`);
-        if(this.options.update === false) return false; 
+        if(this.options.update === false) {
+            this.downloadsFinished++;
+            this.checkIfFinished();
+            return false; 
+        }
         else this.infoOut(`Redownloading the file ${download.url}.`);
     }
 
@@ -465,9 +471,10 @@ Downloader.prototype.checkIfFinished = function(){
     }
 
     if(this.fileSystemIO > 0) return false;
-    if(this.downloadsFinished < this.downloads.length) return false;
     if(this.retries > 0 ) return false; 
     if(this.concurrentRequests > 0 ) return false; 
+
+    if(this.downloadingInProgress && this.downloadsFinished < this.downloads.length) return false;
 
     this.finish();
 }
@@ -568,11 +575,16 @@ Downloader.prototype.finishHook = function(){
 
 // downloader.writeDownloaderFile();
 
-function createJSONFile(){
-    fsp.readFile('./data/baseballRefUrls.json')
-        .then(data => {
-            let urls = JSON.parse(data).urls;
 
+
+function createJSONFile(doNothing = false, startDownload = false, writeJSON = false){
+    if(doNothing) return Promise.resolve();
+
+    return fsp.readFile('./data/baseballRefUrls.json')
+        .then(data => {
+
+            let urls = JSON.parse(data).urls;
+            urls = urls.slice(0,15);
             urls = urls.map((urlObj) => 'http://www.baseball-reference.com' + urlObj.url);
 
             let downloader = new Downloader(
@@ -588,28 +600,41 @@ function createJSONFile(){
             );
 
             downloader.readyToDownloadPromise
-                .then(() => downloader.writeDownloaderFile());
-        });
+                    .then(()=> {if(writeJSON) downloader.writeDownloaderFile()})
+                    .then(()=> {if(startDownload) downloader.startDownloading()})
+                    .catch(err => console.log(err));
+        })
+        .catch(err => console.log(err));
 }
-// createJSONFile();
+
+createJSONFile(false, false, true)
+    .then(() => {
+        let downloader = new Downloader(
+        './data/urls.json', 
+        {
+            downloaderFileDir: './data/',
+            downloaderFileBackupDir: './data/backups/',
+            downloaderFileLoc: './data/urls.json',
+            downloadsDestination: './data/pages/',
+            useTor: false, 
+            maxConcurrentRequests: 50
+        });
+
+        downloader.readyToDownloadPromise
+            .then(() => downloader.clean())
+            .then(() => downloader.startDownloading());
+    });
 
 
-let downloader = new Downloader(
-     './data/urls.json', 
+// createJSONFile(false);
 
-    {
-        downloaderFileDir: './data/',
-        downloaderFileBackupDir: './data/backups/',
-        downloaderFileLoc: './data/urls.json',
-        downloadsDestination: './data/pages/',
-        useTor: true, 
-        maxConcurrentRequests: 1000
-    }
-);
 
-downloader.readyToDownloadPromise
-    // .then(() => downloader.clean())
-    .then(() => downloader.startDownloading());
+
+// );
+
+// downloader.readyToDownloadPromise
+//     .then(() => downloader.clean())
+//     .then(() => downloader.startDownloading());
 
 
 

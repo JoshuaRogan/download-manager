@@ -6,6 +6,12 @@
 
 import colors from 'colors';
 import util from 'util';
+// import readline from 'readline';
+
+// const rl = readline.createInterface({
+//   input: process.stdin,
+//   output: process.stdout
+// });
 
 colors.setTheme({
   normal: 'white',
@@ -99,6 +105,7 @@ Debug.prototype.debug = function(message, minLevel = false, options = {}){
             });
         }
 
+        //CHECK TO SEE IF THE MESSAGE IS OF FROM THE SAME FUNCTION IF SO CLEAR THE LAST ONE
         if(this.tempOptions.colorPrefixOnly === true){
             this.standardOut(message);
         }

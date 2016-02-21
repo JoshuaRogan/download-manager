@@ -2,7 +2,12 @@
 
 import md5 from 'md5';
 
-function QueueDownloads(time = 100){
+
+/**
+ * 
+ * @param {Number} time [description]
+ */
+function DownloadQueue(time = 100){
     //Very good use for weak map. Everything will eventually be added back to this on finish
     this.boundFunctions = new Map();    
     this.names = [];                    //Fast access to keys
@@ -11,7 +16,7 @@ function QueueDownloads(time = 100){
 }
 
 //Only add new functions
-QueueDownloads.prototype.add = function(name, boundFunction){
+DownloadQueue.prototype.add = function(name, boundFunction){
     let index = md5(name);
 
     if(!this.boundFunctions.has(index)){
@@ -23,7 +28,7 @@ QueueDownloads.prototype.add = function(name, boundFunction){
 }
 
 //Wait to pop and call the bound function
-QueueDownloads.prototype.delayPopCall = function(){
+DownloadQueue.prototype.delayPopCall = function(){
     if(this.total > 0){
         this.total--;
         setTimeout(() => {
@@ -38,4 +43,4 @@ QueueDownloads.prototype.delayPopCall = function(){
 
 }
 
-module.exports = QueueDownloads;
+module.exports = DownloadQueue;
