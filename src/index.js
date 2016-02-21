@@ -19,7 +19,7 @@ import md5 from 'md5';
  * @param {String or Array}  files   Either an array of urls or a json file location
  * @param {Object} options configuration options
  */
-function Downloader(files = [], options = {}){
+function Downloader(files, options = {}){
     //Clone Options
     this.options = Object.create(Downloader.prototype.options);
     this.options = Object.assign(this.options, options);
