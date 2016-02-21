@@ -3,6 +3,7 @@
 import DownloadQueue from './downloadQueue.js'
 import Download from './download.js'
 import Debug from './debugger.js'
+import Request from './request.js'
 
 import basicrequest from 'request';
 import torrequest from 'torrequest';
@@ -28,6 +29,19 @@ function Downloader(files, options = {}){
     this.downloadQueue = new DownloadQueue(this.options.timeBetweenRequests);
     this.urlsMap = new Map(); //Access the downloads via the md5 of the url
     this.downloads = []; //Fast array access the downloads
+    
+    //Downloads Maps md5(url) => Download Object
+    this.allDownloads = new Map(); 
+    this.pendingDownloads = []; 
+    this.activeDownloads = []; 
+    this.finishedDownloads = []; 
+
+    //Requests Maps md5(url) => Request Object
+    this.allRequests = new Map(); 
+    this.pendingRequests = []; 
+    this.activeRequests = []; 
+    this.retringRequests = []; 
+    this.finishedRequests = []; 
 
     //Initialize Properties
     this.readyToDownload = false;
@@ -36,7 +50,7 @@ function Downloader(files, options = {}){
     this.finished = false;   
 
     //Status Counters
-    this.fileSystemIO = 0; //Active filesystem reads/writes
+    this.fileSystemIO = 0; 
     this.concurrentRequests = 0; 
     this.downloadsFinished = 0;
     this.totalRequests = 0;
@@ -115,8 +129,10 @@ Downloader.prototype.startDownloading = function(options = {}){
     this.finished = false;
 
     for(let download of this.downloads){
-        this.startDownload(download);
+        this.allRequests.set(download.urlHash, new Request('tor', {url: download.url}));
+        // this.startDownload(download);
     }
+    this.infoOut(this.allRequests);
 }
 
 //Only start inactive downloads (ignores update option)
@@ -134,25 +150,36 @@ Downloader.prototype.restartDownloading = function(){
 
 //Add a new page to be downloaded
 Downloader.prototype.addPage = function(url, options = {}){
-    options = Object.assign({updateJSON: true, addDuplicates: false}, options);
-    let hash = md5(url); 
+    options = Object.assign({updateJSON: true}, options);
 
-    if(!this.urlsMap.has(hash) || options.addDuplicates){
-        let download = new Download(url); 
-        this.urlsMap.set(hash, download);
-        this.downloads.push(download);
+    let hash = md5(url);
+    let download = new Download(url);
 
-        if(options.updateJSON) this.writeDownloaderFile();
-
-        //Restart downloading if neccessary
-        if(!options.init && this.downloadingInProgress !== true){
-            this.infoOut('Page added. Need to restart.'); 
-            this.restartDownloading();
-        }
+    if(!this.allDownloads.has(hash)){
+        this.allDownloads.set(hash, download); 
     }
     else{
-        this.infoOut(`The url "${url}" has already been added! Skipping.`, 2, {colorOverride: 'blue', prefix: '[DUPLICATE URL] '});
+        this.infoOut('Duplicate URL. Skipping...')
     }
+
+
+
+    // if(!this.urlsMap.has(hash) || options.addDuplicates){
+    //     let download = new Download(url); 
+    //     this.urlsMap.set(hash, download);
+    //     this.downloads.push(download);
+
+    //     if(options.updateJSON) this.writeDownloaderFile();
+
+    //     //Restart downloading if neccessary
+    //     if(!options.init && this.downloadingInProgress !== true){
+    //         this.infoOut('Page added. Need to restart.'); 
+    //         this.restartDownloading();
+    //     }
+    // }
+    // else{
+    //     this.infoOut(`The url "${url}" has already been added! Skipping.`, 2, {colorOverride: 'blue', prefix: '[DUPLICATE URL] '});
+    // }
 }
 
 //Reset all of the Download objects & update the json file
@@ -197,7 +224,19 @@ Downloader.prototype.startDownload = function(download){
     if(this.shouldDownload(download)){
         this.downloaderDebug(`Started Download`);
         this.concurrentRequests++;
-        download.start(); //Simply adds properties of start time and status
+
+        download.start(); 
+        this.allDownloads = new Map(); 
+        this.activeDownloads = new Map(); 
+        this.finishedDownloads = new Map(); 
+
+        //Requests Maps md5(url) => Request Object
+        this.allRequests = new Map(); 
+        this.activeRequests = new Map(); 
+        this.retringRequests = new Map();
+        this.finishedRequests = new Map();
+
+
 
         //How to make the request 
         let requestConfig = Object.create(this.options.requestConfig);
@@ -206,7 +245,6 @@ Downloader.prototype.startDownload = function(download){
         //Create the request 
         let promise = new Promise((resolve, reject) => {
             this.totalRequests++;
-
             this.networkDebugger(`Request (${this.concurrentRequests} / ${this.options.maxConcurrentRequests}) [total = ${this.totalRequests}] created to ${requestConfig.url}`);
 
             this.request(requestConfig, (err, response, contents) => {
