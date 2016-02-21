@@ -110,11 +110,13 @@ Downloader.prototype.options = {
 |   -addPage(url) add another page to the urls 
 */
 
+
+
 //Activate all downloads
 Downloader.prototype.startDownloading = function(options = {}){
     if(this.readyToDownload === false) {
-        this.errorOut('Not Ready to download'); 
-        throw new Error('Not Ready to download');
+        this.errorOut('Not Ready to download. Waiting on JSON file.'); 
+        throw new Error('Not Ready to download. Waiting on JSON file.');
     }
 
     //Combine options
@@ -136,7 +138,7 @@ Downloader.prototype.startDownloading = function(options = {}){
 }
 
 //Only start inactive downloads (ignores update option)
-Downloader.prototype.restartDownloading = function(){
+Downloader.prototype.restartDownloads = function(){
     this.infoOut('Restarting Downloader');
     this.downloadingInProgress = true;
     this.finished = false;
@@ -148,6 +150,21 @@ Downloader.prototype.restartDownloading = function(){
     }
 }
 
+//Genertic better 
+Downloader.prototype.addURL = function (url){
+    let hash = md5(url);
+    let download = new Download(url);
+
+    if(!this.allDownloads.has(hash)){
+        this.allDownloads.set(hash, download); 
+        this.pendingDownloads.push(hash);
+    }
+    else{
+        this.infoOut('Duplicate URL. Skipping...');
+    }
+
+}
+
 //Add a new page to be downloaded
 Downloader.prototype.addPage = function(url, options = {}){
     options = Object.assign({updateJSON: true}, options);
@@ -157,9 +174,10 @@ Downloader.prototype.addPage = function(url, options = {}){
 
     if(!this.allDownloads.has(hash)){
         this.allDownloads.set(hash, download); 
+        this.pendingDownloads.push(hash);
     }
     else{
-        this.infoOut('Duplicate URL. Skipping...')
+        this.infoOut('Duplicate URL. Skipping...');
     }
 
 
@@ -216,6 +234,18 @@ Downloader.prototype.clean = function(){
 |   - createDownloads(urls) - create all of the download objects 
 |   - finish(properties) - tasks when everything is completed
 */
+
+
+Downloader.prototype.initRequest = function(download){
+    if(!this.allRequests.has(download.urlHash)){
+        this.allRequests.set(download.urlHash, new Request('tor', {url: download.url}));
+        this.pendingRequests.push(download.urlHash); 
+
+        //Attempt to fire more requests 
+    }
+}
+
+
 
 //Base Start Download
 Downloader.prototype.startDownload = function(download){
