@@ -32,7 +32,9 @@ Request.prototype.send = function(){
                     if(!err){
                         this.success = true;
                         this.requestSent = false;  
-                        resolve(contents); 
+
+                        //Figure this out
+                        resolve({urlHash: this.urlHash}); 
                     }
                     else{
                         this.timesFailed++;

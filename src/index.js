@@ -60,11 +60,8 @@ function Downloader(files, options = {}){
     if(this.options.useTor) this.networkDebugger = this.torDebugger; 
 
     //Initalize URLS
-    if(Array.isArray(files)){
-        this.infoOut('Initializing Downloader from files array');
-        this.createDownloads(files); 
-        this.readyToDownload = true; 
-        this.readyToDownloadPromise = Promise.resolve();
+    if(Array.isArray(files) && this.noJSONFile()){
+        this.initiazlieFromArray(files); 
     }
     else{
         this.infoOut('Initializing Downloader from JSON file');
@@ -74,7 +71,23 @@ function Downloader(files, options = {}){
                 this.options = Object.assign(this.options, options);
             }); 
     }
+}
 
+//Initalize from an array of files
+Downloader.prototype.initiazlieFromArray = function(files) {
+    this.infoOut('Initializing Downloader from files array');
+    this.createDownloads(files); 
+    this.readyToDownload = true; 
+    this.readyToDownloadPromise = Promise.resolve();
+}
+
+Downloader.prototype.initiazlieFromJSONFile = function(fileLoc) {
+
+}
+
+//
+Downloader.prototype.noJSONFile = function (){
+    return false; 
 }
 
 //Base Configuration 
@@ -318,7 +331,7 @@ Downloader.prototype.startDownload = function(download){
 }
 
 //Parse the downloader.json and update this instance (Only needs to have a property called downloads that contain URL properties)
-Downloader.prototype.parseDownloaderFile = function(downloaderFileLoc){   
+Downloader.prototype.parseDownloaderFile = function(){   
     //Load and JSON file
     return this.loadDownloaderFile()
         .then((json)=>{
@@ -615,6 +628,14 @@ Downloader.prototype.finishHook = function(){
 |
 */
 
+/**
+ * Determines if a json file exists at the fileloc
+ * @param  {string} fileloc loaction of the downloader json file
+ * @return {[type]}         [description]
+ */
+function jsonFileExists(fileloc){
+
+}
 
 
 

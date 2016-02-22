@@ -4,7 +4,9 @@
     "description": "Node js web page downloader. Reasonable web downloader that records state and allows you to start and stop downloads. Ability to route through tor. ",
     "main": "index.js",
     "scripts": {
-        "build": "babel src -d lib"
+        "build": "babel src -d lib",
+        "index": "npm run build && echo ' ' && node lib/index.js",
+        "downman": "npm run build && echo ' ' && node lib/downloaderManager.js"
     },
     "keywords": ["download", "manager", "tor", "scraper", "web", "web pages", "file"],
     "author": "Josh Rogan",
