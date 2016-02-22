@@ -37,6 +37,7 @@ function DownloaderManager(downloads = []){
  */
 DownloaderManager.prototype.addDownloads = function(downloads){
     for(let download of downloads){
+        if(Array.isArray(download)) download = download[1];
         this.allDownloads.add(download.urlHash); 
         this.avaiableDownloads.add(download.urlHash); 
         this.queue.push(download.urlHash);
@@ -76,6 +77,8 @@ DownloaderManager.prototype.queue = function(download){
  * @return {String or Boolean}    either the url hash or false
  */
 DownloaderManager.prototype.getNextAvaiable = function(){
+    if(this.queue.length === 0) this.updateQueue();
+
     while(this.queue.length > 0){
         let urlHash = this.queue.pop();
         if(this.avaiableDownloads.has(urlHash)){
@@ -147,15 +150,16 @@ DownloaderManager.prototype.setFailed = function(urlHash){
 |   
 */
 
-DownloaderManager.prototype.isCompleted = function(update = true){
+DownloaderManager.prototype.isCompleted = function(){
     if(this.activeDownloads.size > 0){
         return false;
     }
 
     if(this.allDownloads.size !== (this.successfulDownloads.size + this.failedDownloads.size)){
-        if(this.avaiableDownloads.size > 0){
+        if(this.avaiableDownloads.size > 0 && this.queue.length === 0){
             if(this.update) this.updateQueue();
         }   
+        
         return false; 
     }
 
@@ -167,7 +171,7 @@ DownloaderManager.prototype.info = function(){
         successCount: this.successfulDownloads.size,
         failedCount: this.failedDownloads.size,
         queueLength: this.queue.length,
-        isCompleted: this.isCompleted(false),
+        isCompleted: this.isCompleted(),
         DownloaderManager: this
     }
 }
