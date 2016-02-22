@@ -31,10 +31,7 @@ function Downloader(files, options = {}){
     this.downloads = []; //Fast array access the downloads
     
     //Downloads Maps md5(url) => Download Object
-    this.allDownloads = new Map(); 
-    this.pendingDownloads = []; 
-    this.activeDownloads = []; 
-    this.finishedDownloads = []; 
+    this.downloaderManager = undefined;
 
     //Requests Maps md5(url) => Request Object
     this.allRequests = new Map(); 

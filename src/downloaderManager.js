@@ -15,7 +15,7 @@ import Download from './download.js';// only for testing
  * 
  * @param {Iterable}  downloads  iterable object of initial downloads
  */
-function DownloaderManager(downloads){
+function DownloaderManager(downloads = []){
     
     //Sets of urlHashes  
     this.allDownloads = new Set();             //All of the downloadstoo late
@@ -28,14 +28,14 @@ function DownloaderManager(downloads){
     this.queue = [];                           //Keys of downloads in the queue (will contain duplicates)
 
     //Add the hashes to the appropriate maps
-    this.initSets(downloads); 
+    this.addDownloads(downloads); 
 }
 
 /**
  * Initialize the sets from an iterable object of downloads
  * @param  {Iterable} downloads list of Download Objects
  */
-DownloaderManager.prototype.initSets = function(downloads){
+DownloaderManager.prototype.addDownloads = function(downloads){
     for(let download of downloads){
         this.allDownloads.add(download.urlHash); 
         this.avaiableDownloads.add(download.urlHash); 
@@ -158,7 +158,7 @@ DownloaderManager.prototype.isCompleted = function(update = true){
         }   
         return false; 
     }
-    
+
     return true; 
 }
 
@@ -168,7 +168,7 @@ DownloaderManager.prototype.info = function(){
         failedCount: this.failedDownloads.size,
         queueLength: this.queue.length,
         isCompleted: this.isCompleted(false),
-        DownloaderManager: this, 
+        DownloaderManager: this
     }
 }
 
@@ -179,22 +179,23 @@ DownloaderManager.prototype.info = function(){
 |   
 */
 
-let downloads = [];
-downloads.push(new Download('http://google.com')); 
-downloads.push(new Download('http://facebook.com')); 
-downloads.push(new Download('http://amazon.com')); 
+// let downloads = [];
+// downloads.push(new Download('http://google.com')); 
+// downloads.push(new Download('http://facebook.com')); 
+// downloads.push(new Download('http://amazon.com')); 
 
 
-let downloaderManager = new DownloaderManager(downloads); 
+// let downloaderManager = new DownloaderManager(downloads); 
 
-let nextqueue = downloaderManager.getNextAvaiable();
-let nextqueue2 = downloaderManager.getNextAvaiable();
-let nextqueue3 = downloaderManager.getNextAvaiable();
+// let nextqueue = downloaderManager.getNextAvaiable();
+// let nextqueue2 = downloaderManager.getNextAvaiable();
+// let nextqueue3 = downloaderManager.getNextAvaiable();
 
-downloaderManager.setActive(nextqueue);
-downloaderManager.setSuccess(nextqueue2);
-downloaderManager.setFailed(nextqueue3);
+// downloaderManager.setActive(nextqueue);
+// downloaderManager.setSuccess(nextqueue2);
+// downloaderManager.setFailed(nextqueue3);
 
-console.log(downloaderManager.info());
+// console.log(downloaderManager.info());
 
 
+module.exports = DownloaderManager; 

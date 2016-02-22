@@ -6,6 +6,7 @@
     "scripts": {
         "build": "babel src -d lib",
         "index": "npm run build && echo ' ' && node lib/index.js",
+        "downloader": "npm run build && echo ' ' && node lib/downloader.js",
         "downman": "npm run build && echo ' ' && node lib/downloaderManager.js"
     },
     "keywords": ["download", "manager", "tor", "scraper", "web", "web pages", "file"],
