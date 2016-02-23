@@ -1,7 +1,7 @@
 "use strict";
 
+import "babel-polyfill";
 import md5 from 'md5';
-
 import Download from './download.js';// only for testing
 
 /**
@@ -72,7 +72,8 @@ DownloaderManager.prototype.queue = function(download){
 */
 
 /**
- * Get the next download key in the avaiable downloads set
+ * Get the next download key in the avaiable downloads set.
+ * Consider changing to a generator
  * 
  * @return {String or Boolean}    either the url hash or false
  */
@@ -86,6 +87,18 @@ DownloaderManager.prototype.getNextAvaiable = function(){
         }
     }
     return false; 
+}
+
+DownloaderManager.prototype.avaiableGenerator = function*(){
+   while(!this.isCompleted()){
+        while(this.queue.length > 0){
+            let urlHash = this.queue.pop();
+            if(this.avaiableDownloads.has(urlHash)){
+                yield urlHash;
+            }
+        }
+        this.updateQueue(); 
+   }
 }
 
 /**
