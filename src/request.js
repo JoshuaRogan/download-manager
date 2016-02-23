@@ -5,13 +5,13 @@ import md5 from 'md5';
 import basicrequest from 'request';
 import torrequest from 'torrequest';
 
-function Request(type, config){
+function Request(url, type = basicrequest, config = {}){
     this.timesRequested = 0;
     this.requestSent = false; 
     this.timesFailed = 0; 
     this.success = false; 
-    this.urlHash = md5(config.url);
-    this.url = config.url;
+    this.urlHash = md5(url);
+    this.url = url;
 }
 
 /**

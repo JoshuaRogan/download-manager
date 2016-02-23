@@ -33,6 +33,8 @@ function Downloader(downloads, config = {}){
         this.initDownloads(downloads)
             .then(()=>{        
                 this.initDownloaderManager(); 
+                this.initRequests();
+                console.log(this);
             });
 }
 
@@ -148,6 +150,7 @@ Downloader.prototype.initDownloads = function(downloads){
    else return this.initDownloadsJSON(downloads); 
 }
 
+//load from array of urls
 Downloader.prototype.initDownloadsArray = function(filesArray){
    for(let url of filesArray){
         this.downloads.set(md5(url), new Download(url));
@@ -156,6 +159,7 @@ Downloader.prototype.initDownloadsArray = function(filesArray){
    return Promise.resolve('Files added from array finished.'); 
 }
 
+//load from json file
 Downloader.prototype.initDownloadsJSON = function(jsonFileLoc){
     //Read and parse the json file
     return this.loadJSONFile()
@@ -165,16 +169,16 @@ Downloader.prototype.initDownloadsJSON = function(jsonFileLoc){
     
 }
 
+//create request objects from the downloads map
 Downloader.prototype.initRequests = function(){
     for(let download of this.downloads){
-        this.request.set(download.urlHash, new Request());
+        this.requests.set(download[0], new Request(download[1].url));
     }
 }
 
+//create the downloader manager
 Downloader.prototype.initDownloaderManager = function(){
-    // console.log(this.downloads);
     this.downloaderManager = new DownloaderManager(this.downloads);
-    console.log(this.downloaderManager);
 }
 
 /*
@@ -325,7 +329,7 @@ Downloader.prototype.toJSON = function(downloader = this){
 */
 
 
-let downloader = new Downloader(['http://google.com', 'http://amazon.com'],{}).start();
-// downloader.start();
+let downloader = new Downloader(['http://google.com', 'http://amazon.com'],{});
+downloader.start();
 
 // downloader.promises.readyToStart
