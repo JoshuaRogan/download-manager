@@ -8,7 +8,10 @@
     "index": "npm run build && echo ' ' && node lib/index.js",
     "downloader": "npm run build && echo ' ' && node lib/downloader.js",
     "downman": "npm run build && echo ' ' && node lib/downloaderManager.js",
-    "generator": "npm run build && echo ' ' && node lib/generator.js"
+    "generator": "npm run build && echo ' ' && node lib/generator.js",
+    "simple": "npm run build && echo ' ' && node lib/simpleDownloader.js"
+    
+
   },
   "keywords": [
     "download",
