@@ -35,6 +35,14 @@ let config = {
     }
 };
 
+/*
+|--------------------------------------------------------------------------
+| Public API
+|--------------------------------------------------------------------------
+|   - download()
+|   - restart()
+|   
+*/
 
 /**
  * Initalize 
@@ -52,6 +60,15 @@ function restart(){
 
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Setup
+|--------------------------------------------------------------------------
+|   - init()
+|   
+|   
+*/
 /**
  * Setup Inital properties and data structures 
  * @return {[type]} [description]
@@ -60,6 +77,16 @@ function init(){
     //Setup the downloads
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Intenral API
+|--------------------------------------------------------------------------
+| 
+|   
+|   
+*/
+
 /**
  * Iterator to get the next key or false if there isn't a good one avaiable but
  * more will be available later.
@@ -67,7 +94,7 @@ function init(){
  * @yield {String} Key to a ready download object
  */
 function* readyKey(){
-    while(activeQueue.length > 0 && finished.length + failed.length < downloadsMap.length){
+    while(hasMore()){
         if(avaiableQueue.length){
             let key = activeQueue.shift(); 
             if(shouldDownload(key)){
@@ -81,33 +108,18 @@ function* readyKey(){
     }
 }
 
+
 /**
- * get the contents of a page
- * @param {[type]} url           [description]
- * @yield {[type]} [description]
+ * 
+ * 
+ * 
  */
 function downloaderLoop(){
-    while(true){
-        let key = md5(url); 
-
-        if(shouldDownload(key)){
-            let result = yield startDownload(key); 
-            return result;
-        }
-        else{
-            return `${url} is not ready to be downloaded.`
-        }  
-    }
+    let readyKeys = readyKey();
+    
 }
 
-/**
- * Should we download this key
- * @param  {String} key to match
- * @return {Boolean} 
- */
-function shouldDownload(key){
-    return availableSet.has(key);
-}
+
 
 /**
  * Trigger the download 
@@ -119,6 +131,16 @@ function startDownload(key){
     return download.start(); 
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+|   - init()
+|   
+|   
+*/
+
 /**
  * Save the contents of a finished download
  * @param  {String} key md5 of the url
@@ -129,8 +151,23 @@ function writeContents(key){
     return download.writeContents(); 
 }
 
+/**
+ * Should we download this key
+ * @param  {String} key to match
+ * @return {Boolean} 
+ */
+function shouldDownload(key){
+    return availableSet.has(key);
+}
 
 
+/**
+ * More downloads not finished or failed avaiable. 
+ * @return {Boolean} 
+ */
+function hasMore(){
+    return activeQueue.length > 0 && finished.length + failed.length < downloadsMap.length;
+}
 
 
 
