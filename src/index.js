@@ -13,6 +13,9 @@ let activeQueue = [];               // Queue of md5(urls) of the next url to try
 let finished = new Set();           // Finished download keys
 let failed = new Set();             // Failed download keys
 
+let moreUpdates = false;            // More updates to the json file requested
+let activeUpdate = false;           // Update in progress
+
 let config = {
     JSONFileDir: './',                              
     JSONFileDir: 'DownloadManager.json',                              
@@ -149,6 +152,28 @@ function startDownload(key){
 function writeContents(key){
     let download = downloadsMap.get(key);
     return download.writeContents(); 
+}
+
+/**
+ * Update this JSON file
+ * @param  
+ * @return {Promise}    
+ */
+function updateJSON(){
+    if(!activeUpdate){
+        activeUpdate = true; 
+        fsp.writeFile('filename.json', json)
+            .then(() => {
+                activeUpdate = false; 
+                if(moreUpdates) {
+                    moreUpdates = false; 
+                    updateJSON();
+                }
+            });
+    }
+    else{
+        moreUpdates = true; 
+    }
 }
 
 /**
