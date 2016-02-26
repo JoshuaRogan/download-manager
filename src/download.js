@@ -146,5 +146,14 @@ Object.defineProperty(this, 'request', {
     }
 });
 
+Object.defineProperty(this, 'config', {
+    get: function(){
+        if(this.hasOwnProperty('config')){
+            return Object.assign({}, Download.prototype.config, this.config);
+        }
+        else return Download.prototype.config; 
+    }
+});
+
 
 module.exports = Download;
