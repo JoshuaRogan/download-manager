@@ -140,6 +140,13 @@ Download.prototype.addProps = function(properties){
     }
 }
 
+/*
+|--------------------------------------------------------------------------
+| Custom Getters and Setters
+|--------------------------------------------------------------------------
+|   
+|   
+*/
 Object.defineProperty(this, 'request', {
     get: function(){
         return (this.useTor === true) ? torrequest : basicrequest;
