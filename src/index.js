@@ -48,9 +48,9 @@ let config = {
 let linksConfig = {
     followLinks: false, 
     maxDepth: 4,
-    filters: [ //Filters at each depth
-        function(link){return link;},
-        function(link){return link;}
+    filters: [ //Filters for each depth
+        function(domAnchor){return domAnchor.href;},
+        function(domAnchor){return domAnchor.href;}
     ]
 };
 
