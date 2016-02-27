@@ -40,6 +40,8 @@ Download.prototype.createFromJSON = function(jsonObj){
 Download.prototype.count = 0;
 Download.prototype.maxAttemps = 10;
 
+Download.prototype.attemptsThrottle = 1000;
+
 Download.prototype.config = {};
 Download.prototype.setConfig = function(config){
     Download.prototype.config = config;
@@ -59,61 +61,69 @@ Download.prototype.setTor = function(boolean = true){
 //Return a cleaned download object
 Download.prototype.clean = function(){
     let download = new Download(this.url); 
-    this = download; 
-    return this; 
+    return download; 
 }
 
 Download.prototype.start = function(){
     return new Promise((resolve, reject) => {
-        this.attempts++;
-
         if(this.failed) {
-            reject({message:`${this.url} is in fail state.`}); 
+            this.message = `${this.url} is in fail state.`;
+            reject(this); 
         }
         else if(this.downloading) {
-            reject({message:`${this.url} is already downloading`}); 
+            this.message = `${this.url} is already downloading`;
+            reject(this);
         }
         else if(this.downloaded){
-            reject({message:`${this.url} is already downloaded.`});
+            this.message = `${this.url} is already downloaded.`;
+            reject(this);
         }
         else if(this.waiting){
-            reject({message:`${this.url} is waiting to try again.`});
+            this.message = `${this.url} is waiting to try again.`;
+            reject(this);
         }
         else if(this.wait){
             if(this.attempts < this.maxAttemps){
                 this.waiting = true; 
+
                 setTimeout(()=>{
                     this.wait = false;
                     this.waiting = false; 
                     resolve(this); 
-                }, 1000 * this.attempts); 
+                }, this.attemptsThrottle * this.attempts); 
             }
             else{
                 this.failed = true; 
-                reject({message: `${this.url} has been attemped too many times.`});
+                this.message = `${this.url} has been attemped too many times.`;
+                reject(this);
             }
         }
         else{
+            this.attempts++;
             this.downloading = true;
-            this.startedAt = new Date(); 
+            this.startedAt = new Date();
+            // let config = Object.assign 
 
-            this.request(this.requestConfig, (err, response, contents) => {
+            this.request({uri: this.url}, (err, response, contents) => {
                 if(!err){
                     this.finishedAt = new Date();
                     this.success = true;
                     this.downloading = false; 
                     this.downloaded = true; 
                     this.fileContents = contents;   
-                    this.response = response;   
-                    // this.contentsHash = md5(contents);
+                    this.response = response; 
 
-                    resolve({urlHash: this.urlHash, success: true}); 
+                    this.message = 'Completed successfully'; 
+                    resolve(this); 
                 }
                 else{
                     this.success = false;
                     this.downloading = false;
-                    this.wait = true;   
-                    reject({message: `${this.url} request failed.`, error: err});
+                    this.wait = true;
+                    this.message = `${this.url} request failed.`;
+                    this.error = err; 
+
+                    reject(this);
                 }
             });
         }
@@ -121,13 +131,28 @@ Download.prototype.start = function(){
     });
 }
 
-//Write the contents of this download to the destination
-Download.prototype.writeContents(dest) = function(){
+//Write the contents of this download to the directory
+Download.prototype.writeContents = function(dir){
     return new Promise((resolve, reject) => {
-        if(!this.downloaded) reject(`${this.url} isn't downloaded yet!`);
-        else if(!this.fileContents) reject(`${this.url} doesn't have contents!`);
+        if(!this.downloaded || !this.fileContents) {
+            this.message = `${this.url} is not ready to be written!`;
+            reject(this);
+        }
         else{
-            console.log(this.fileContents);
+            let fileLocation = ''; 
+            fsp.writeFile(fileLocation, this.fileContents)
+                .then(()=>{
+                    this.writtenToFile = true;
+                    this.fileLocation = fileLocation;
+                    this.message = `Successfull write of ${this.url} to ${fileLocation}`;
+                    resolve(this); 
+                })
+                .catch(err => {
+                    this.writtenToFile = false;
+                    this.message = `Failed write of ${this.url} to ${fileLocation} \n ${err}`;
+                    this.error = err; 
+                    reject(this);
+                });
         }
     });
 }
@@ -147,13 +172,13 @@ Download.prototype.addProps = function(properties){
 |   
 |   
 */
-Object.defineProperty(this, 'request', {
+Object.defineProperty(Download.prototype, 'request', {
     get: function(){
         return (this.useTor === true) ? torrequest : basicrequest;
     }
 });
 
-Object.defineProperty(this, 'config', {
+Object.defineProperty(Download.prototype, 'config', {
     get: function(){
         if(this.hasOwnProperty('config')){
             return Object.assign({}, Download.prototype.config, this.config);
@@ -161,6 +186,17 @@ Object.defineProperty(this, 'config', {
         else return Download.prototype.config; 
     }
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| Testing
+|--------------------------------------------------------------------------
+|   
+|   
+*/
+let download = new Download('http://google.com');
+download.start().then((download) => console.log(download));
 
 
 module.exports = Download;

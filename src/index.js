@@ -8,8 +8,8 @@ import fsp from 'fs-promise';
 //Data Structures
 let downloadsMap = new Map();       // md5(url) => Download
 let avaiableQueue = [];             // Queue of md5(urls) of the next url to try to download
-let activeQueue = [];               // Queue of md5(urls) of the next url to try to download
 
+let active = new Set();             // Active download keys
 let finished = new Set();           // Finished download keys
 let failed = new Set();             // Failed download keys
 
@@ -21,9 +21,9 @@ let config = {
     JSONFileDir: 'DownloadManager.json',                              
     backupDir: './_node-downloader/backups/',    
     downloadsDir: './_node-downloader/pages/',             
-    maxAttemps: 10,
+    maxAttempts: 10,
     maxConcurrentRequests: 50,
-    timeBetweenRequests: 500,
+    throttle: 500,
     breakInterval: 1000,                      
     breakTime: 1000,                          
     useTor: false,
@@ -94,10 +94,12 @@ function init(){
  * Iterator to get the next key or false if there isn't a good one avaiable but
  * more will be available later.
  *  
- * @yield {String} Key to a ready download object
+ * @yield {Promise} Promise that will resolve with a key
  */
 function* readyKey(){
     while(hasMore()){
+
+
         if(avaiableQueue.length){
             let key = activeQueue.shift(); 
             if(shouldDownload(key)){
@@ -111,16 +113,44 @@ function* readyKey(){
     }
 }
 
+function triggerNext(){
+    if(avaiableQueue.length){
+        let key = avaiableQueue.shift();
+        active.set(key); 
+        startDownload();
+    }
+}
 
 /**
  * 
  * 
  * 
  */
-function downloaderLoop(){
-    let readyKeys = readyKey();
-    
+function initialLoop(){
+    let max = config.maxConcurrentRequests > avaiableQueue ? avaiableQueue : config.maxConcurrentRequests;
+    for(let i=0; i < max; i++){
+        triggerNext();
+    }
 }
+
+//Promises must accept and reject with this
+function downloadFinished(download){
+    active.delete(download.urlHash);
+    finished.set(download.urlHash);
+    triggerNext(); 
+}
+
+function downloadFailed(download){
+    active.delete(download.urlHash);
+
+    if(download.failed === true){
+        failed.set(download.urlHash);
+    }
+    else{
+        avaiableQueue.push(download.urlHash);
+    }
+}
+
 
 
 
@@ -131,7 +161,11 @@ function downloaderLoop(){
  */
 function startDownload(key){
     let download = downloadsMap.get(key);
-    return download.start(); 
+
+    return 
+         throttle()
+        .then(download.start)
+        .then(downloadFinished, downloadFailed); 
 }
 
 
@@ -143,6 +177,21 @@ function startDownload(key){
 |   
 |   
 */
+
+/**
+ * Promise timeout in between each request 
+ * 
+ * @return {Promise}  
+ */
+function throttle(){
+    return new Promise((resolve, reject) => {
+        if(!config.throttle || config.throttle === 0){
+            resolve(); 
+        }
+
+        setTimeout(resolve, config.throttle); 
+    });
+}
 
 /**
  * Save the contents of a finished download
@@ -204,33 +253,38 @@ function hasMore(){
 
 
 
+// function* triggerRequest(download){
+//     let finished = yield download.start();
+
+// }
+
+// function triggerLoop(triggerRequest){
+//     return new Promise((accept, reject) => {
+//         let onResult = lastPromiseResult => {
+//             let {value, done} = generator.next(lastPromiseResult);
+//             if(!done){
+//                 value.then(onResult, reject);
+//                 value.catch(err => {
+//                     if(!err.)
+//                 })
+//             }
+//             else{
+//                 accept(value);
+//             }
+//         };
+//         onResult();
+//     });
+// }
 
 
 
+// function* getStockPrice(){
+//     let symbol = yield new Promise();
+//     let price = yield new Promise();
+//     return price; 
+// }
 
 
-function* getStockPrice(){
-    let symbol = yield new Promise();
-    let price = yield symbol;
-    return price; 
-}
-
-
-//Eventually switch to task.js
-function spawn(generator){
-    return new Promise((accept, reject) => {
-        let onResult = lastPromiseResult => {
-            let {value, done} = generator.next(lastPromiseResult);
-            if(!done){
-                value.then(onResult, reject);
-            }
-            else{
-                accept(value);
-            }
-        };
-        onResult();
-    });
-}
 
 
 
