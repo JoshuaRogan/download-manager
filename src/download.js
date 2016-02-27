@@ -1,7 +1,6 @@
 "use strict";
 
 import md5 from 'md5';
-
 import basicrequest from 'request';
 import torrequest from 'torrequest';
 
@@ -17,6 +16,7 @@ function Download(url){
     this.attempts = 0;
     this.wait = false;
     this.failed = false;
+
 }
 
 Download.prototype.createFromJSON = function(jsonObj){
@@ -43,13 +43,14 @@ Download.prototype.toJSON = function(){
 
 /*
 |--------------------------------------------------------------------------
-| Static Variables 
+| Static Methods and Variables 
 |--------------------------------------------------------------------------
 |   
 |   
 */
 Download.prototype.count = 0;
 Download.prototype.maxAttemps = 10;
+Download.prototype.destination = './downloaded/';
 
 Download.prototype.attemptsThrottle = 1000;
 
@@ -68,8 +69,6 @@ Download.prototype.setTor = function(boolean = true){
     Download.prototype.useTor = boolean;
 };
 
-
-//Return a cleaned download object
 Download.prototype.clean = function(){
     let download = new Download(this.url); 
     return download; 
@@ -124,7 +123,8 @@ Download.prototype.start = function(){
                     this.fileContents = contents;   
                     this.response = response; 
 
-                    this.message = 'Completed successfully'; 
+                    this.message = 'Completed successfully';
+
                     resolve(this); 
                 }
                 else{
@@ -142,15 +142,14 @@ Download.prototype.start = function(){
     });
 }
 
-//Write the contents of this download to the directory
-Download.prototype.writeContents = function(dir){
+Download.prototype.writeContents = function(destination = this.destination){
     return new Promise((resolve, reject) => {
         if(!this.downloaded || !this.fileContents) {
             this.message = `${this.url} is not ready to be written!`;
             reject(this);
         }
         else{
-            let fileLocation = ''; 
+            let fileLocation = destination + this.filename; 
             fsp.writeFile(fileLocation, this.fileContents)
                 .then(()=>{
                     this.writtenToFile = true;
@@ -168,13 +167,20 @@ Download.prototype.writeContents = function(dir){
     });
 }
 
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+|   
+|   
+*/
 
-//Add new properties to this object 
 Download.prototype.addProps = function(properties){
     for(let property in properties){
         this[property] = properties[property];
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -195,6 +201,16 @@ Object.defineProperty(Download.prototype, 'config', {
             return Object.assign({}, Download.prototype.config, this.config);
         }
         else return Download.prototype.config; 
+    }
+});
+
+Object.defineProperty(Download.prototype, 'filename', {
+    get: function(){
+        if(this.hasOwnProperty('filename')){
+            return this.filename; 
+        }
+
+        return this.url.toLowerCase().replace('http', ''); 
     }
 });
 

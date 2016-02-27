@@ -3,7 +3,8 @@ import "babel-polyfill";
 
 import Download from './download.js';
 import md5 from 'md5';
-import fsp from 'fs-promise'; 
+import fsp from 'fs-promise';
+import emitter from 'event-emitter'; 
 
 //Data Structures
 let downloadsMap = new Map();       // md5(url) => Download
@@ -12,22 +13,28 @@ let avaiableQueue = [];             // Queue of md5(urls) of the next url to try
 let active = new Set();             // Active download keys
 let finished = new Set();           // Finished download keys
 let failed = new Set();             // Failed download keys
+let addingMore = false;             // Adding more from another source
 
 let moreUpdates = false;            // More updates to the json file requested
 let activeUpdate = false;           // Update in progress
 
+//Status 
+let takeBreak = false;              
+
 let config = {
     JSONFileDir: './',                              
-    JSONFileDir: 'DownloadManager.json',                              
+    JSONFileDir: 'downloadmanager.json',                              
     backupDir: './_node-downloader/backups/',    
     downloadsDir: './_node-downloader/pages/',             
     maxAttempts: 10,
     maxConcurrentRequests: 50,
     throttle: 500,
+    breaks: false
     breakInterval: 1000,                      
     breakTime: 1000,                          
     useTor: false,
-    updateAll: false,                              
+    updateAll: false,
+    immediateWrite: false,                               
     requestConfig:{
         timeout: 30000              
     },
@@ -36,6 +43,15 @@ let config = {
         torPort: 9050,
         timeout: 30000  
     }
+};
+
+let linksConfig = {
+    followLinks: false, 
+    maxDepth: 4,
+    filters: [ //Filters at each depth
+        function(link){return link;},
+        function(link){return link;}
+    ]
 };
 
 /*
@@ -52,7 +68,8 @@ let config = {
  * @return {[type]} [description]
  */
 function download(){
-
+    init(); 
+    startBreakTimer()
 }
 
 /**
@@ -61,6 +78,18 @@ function download(){
  */
 function restart(){
 
+}
+
+/**
+ * Download the the url and add links from that page. 
+ * - Filter out only certain links
+ * - Follow and download those links
+ * 
+ * @param {[type]} url [description]
+ */
+function addLinksFromPage(url, config = {}){
+    addingMore = true; 
+    addingMore = false; 
 }
 
 
@@ -78,6 +107,8 @@ function restart(){
  */
 function init(){
     //Setup the downloads
+    
+    //Setup static vars 
 }
 
 
@@ -89,30 +120,6 @@ function init(){
 |   
 |   
 */
-
-/**
- * Iterator to get the next key or false if there isn't a good one avaiable but
- * more will be available later.
- *  
- * @yield {Promise} Promise that will resolve with a key
- */
-function* readyKey(){
-    while(hasMore()){
-
-
-        if(avaiableQueue.length){
-            let key = activeQueue.shift(); 
-            if(shouldDownload(key)){
-                yield key; 
-            }
-        }
-        else{
-            console.log('Available queue is empty. Wait a bit.'); 
-            yield false; 
-        }
-    }
-}
-
 function triggerNext(){
     if(avaiableQueue.length){
         let key = avaiableQueue.shift();
@@ -122,25 +129,32 @@ function triggerNext(){
 }
 
 /**
- * 
+ * Fire off upto maxconcurrent requests 
  * 
  * 
  */
 function initialLoop(){
     let max = config.maxConcurrentRequests > avaiableQueue ? avaiableQueue : config.maxConcurrentRequests;
-    for(let i=0; i < max; i++){
+    for(let i=active.length; i < max; i++){
         triggerNext();
     }
 }
 
-//Promises must accept and reject with this
-function downloadFinished(download){
+
+function downloadAccepted(download){
     active.delete(download.urlHash);
     finished.set(download.urlHash);
     triggerNext(); 
 }
 
-function downloadFailed(download){
+/**
+ * Download failed to finish. If the status is failed it won't be 
+ * attempted again. Otherwise add it back to the queue for try again later.
+ * 
+ * @param  {Download} download the download that reject
+ * @return {[type]}          [description]
+ */
+function downloadRejected(download){
     active.delete(download.urlHash);
 
     if(download.failed === true){
@@ -148,6 +162,7 @@ function downloadFailed(download){
     }
     else{
         avaiableQueue.push(download.urlHash);
+        triggerNext(); 
     }
 }
 
@@ -161,12 +176,16 @@ function downloadFailed(download){
  */
 function startDownload(key){
     let download = downloadsMap.get(key);
+    downloadsStart++;
 
     return 
          throttle()
+        .then(takeBreak)
         .then(download.start)
-        .then(downloadFinished, downloadFailed); 
+        .then(downloadAccepted, downloadRejected); 
 }
+
+
 
 
 /*
@@ -177,6 +196,18 @@ function startDownload(key){
 |   
 |   
 */
+
+/**
+ * Timer to activate breaks
+ * 
+ */
+function startBreakTimer(){
+    if(config.break){
+        setInterval(() =>{
+            takeBreak = true; 
+        }, config.breakInterval)
+    }
+}
 
 /**
  * Promise timeout in between each request 
@@ -194,7 +225,23 @@ function throttle(){
 }
 
 /**
- * Save the contents of a finished download
+ * Take a break after so many requests
+ * 
+ * @return {Promise} [description]
+ */
+function takeBreak(){
+    return new Promise((resolve, reject) => {
+        if(!takeBreak || !config.break || config.breakTime === 0){
+            resolve(); 
+        }
+        takeBreak = false; 
+        setTimeout(resolve, config.breakTime); 
+    });
+}
+
+/**
+ * Save the contents of a finished download.
+ * 
  * @param  {String} key md5 of the url
  * @return {Promise}    
  */
@@ -204,8 +251,8 @@ function writeContents(key){
 }
 
 /**
- * Update this JSON file
- * @param  
+ * Update this JSON file.
+ *   
  * @return {Promise}    
  */
 function updateJSON(){
@@ -240,17 +287,43 @@ function shouldDownload(key){
  * @return {Boolean} 
  */
 function hasMore(){
-    return activeQueue.length > 0 && finished.length + failed.length < downloadsMap.length;
+    return !addingMore && activeQueue.length > 0 && finished.length + failed.length < downloadsMap.length;
 }
 
+/*
+|--------------------------------------------------------------------------
+| CLI Helpers
+|--------------------------------------------------------------------------
+|   
+|   
+|   
+*/
+
+function isCLI(){return true;}
+
+//Update progress bar and overall progress/status information
+function updateProgress(){} 
+
+//New Y/N promst to continue (such as adding lots of new links)
+function newPrompt(){}
+
+function newMessage(){}
+function newWarning(){}
+function newError(){}
 
 
-
-
-
-
-
-
+/*
+|--------------------------------------------------------------------------
+| Events
+|--------------------------------------------------------------------------
+|   
+|   
+|   
+*/
+function onDownloadStart(){}
+function onDownloadFinished(){}
+function onDonloadFailed(){}
+function onRejected(){}
 
 
 // function* triggerRequest(download){
