@@ -23,12 +23,23 @@ Download.prototype.createFromJSON = function(jsonObj){
     Download.prototype.count++;
     let download = Object.create(Download.prototype); 
     Object.assign(download, jsonObj);
+
+    //Ability to just have a json file with urls
     if(!download.urlHash) download.urlHash = md5(download.url);
 
     download.attempts = 0; 
     download.downloading = false;
     return download; 
 }
+
+//Convert this object to JSON
+Download.prototype.toJSON = function(){
+    let json = Object.assign({}, this); 
+    delete json.response;
+    delete json.fileContents;
+    return JSON.stringify(json); 
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -101,12 +112,12 @@ Download.prototype.start = function(){
         else{
             this.attempts++;
             this.downloading = true;
-            this.startedAt = new Date();
+            this.startedAt = new Date().getTime();
             // let config = Object.assign 
 
             this.request({uri: this.url}, (err, response, contents) => {
                 if(!err){
-                    this.finishedAt = new Date();
+                    this.finishedAt = new Date().getTime();
                     this.success = true;
                     this.downloading = false; 
                     this.downloaded = true; 
@@ -196,7 +207,8 @@ Object.defineProperty(Download.prototype, 'config', {
 |   
 */
 let download = new Download('http://google.com');
-download.start().then((download) => console.log(download));
-
+console.log(download.toJSON());
+download.start().then((download) => console.log(download.toJSON()));
+// console.log(download.toJSON());
 
 module.exports = Download;
