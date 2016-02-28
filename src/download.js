@@ -3,6 +3,7 @@
 import md5 from 'md5';
 import basicrequest from 'request';
 import torrequest from 'torrequest';
+import fsp from 'fs-promise';
 
 function Download(url){
     Download.prototype.count++;
@@ -210,7 +211,7 @@ Object.defineProperty(Download.prototype, 'filename', {
             return this.filename; 
         }
 
-        return this.url.toLowerCase().replace('http', ''); 
+        return this.url.toLowerCase().replace(/([\/]|www|http(s)?|com|[:\.])/g, ''); 
     }
 });
 
@@ -224,7 +225,10 @@ Object.defineProperty(Download.prototype, 'filename', {
 */
 let download = new Download('http://google.com');
 console.log(download.toJSON());
-download.start().then((download) => console.log(download.toJSON()));
+download.start()
+    .then((download) => download.writeContents('./'))
+    .then((download) => console.log(download.toJSON()))
+    .catch(console.log);
 // console.log(download.toJSON());
 
 module.exports = Download;

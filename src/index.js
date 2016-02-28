@@ -29,7 +29,7 @@ let config = {
     maxAttempts: 10,
     maxConcurrentRequests: 50,
     throttle: 500,
-    breaks: false
+    breaks: false,
     breakInterval: 1000,                      
     breakTime: 1000,                          
     useTor: false,
@@ -133,26 +133,29 @@ function triggerNext(){
  * 
  * 
  */
-function initialLoop(){
+function triggerMore(){
     let max = config.maxConcurrentRequests > avaiableQueue ? avaiableQueue : config.maxConcurrentRequests;
     for(let i=active.length; i < max; i++){
         triggerNext();
     }
 }
 
-
+/**
+ * Handle accepted promises
+ * @param  {Download} download Accepted download object
+ * 
+ */
 function downloadAccepted(download){
     active.delete(download.urlHash);
     finished.set(download.urlHash);
-    triggerNext(); 
+    triggerMore(); 
 }
 
 /**
- * Download failed to finish. If the status is failed it won't be 
+ * Hanlde Download failed to finish. If the status is failed it won't be 
  * attempted again. Otherwise add it back to the queue for try again later.
  * 
  * @param  {Download} download the download that reject
- * @return {[type]}          [description]
  */
 function downloadRejected(download){
     active.delete(download.urlHash);
@@ -162,11 +165,10 @@ function downloadRejected(download){
     }
     else{
         avaiableQueue.push(download.urlHash);
-        triggerNext(); 
     }
+
+    triggerMore();
 }
-
-
 
 
 /**
@@ -326,44 +328,10 @@ function onDonloadFailed(){}
 function onRejected(){}
 
 
-// function* triggerRequest(download){
-//     let finished = yield download.start();
-
-// }
-
-// function triggerLoop(triggerRequest){
-//     return new Promise((accept, reject) => {
-//         let onResult = lastPromiseResult => {
-//             let {value, done} = generator.next(lastPromiseResult);
-//             if(!done){
-//                 value.then(onResult, reject);
-//                 value.catch(err => {
-//                     if(!err.)
-//                 })
-//             }
-//             else{
-//                 accept(value);
-//             }
-//         };
-//         onResult();
-//     });
-// }
-
-
-
-// function* getStockPrice(){
-//     let symbol = yield new Promise();
-//     let price = yield new Promise();
-//     return price; 
-// }
-
-
-
-
-
 
 //Exposed API
 module.exports = {
     download: download,
-    restart: restart
+    restart: restart,
+    addLinksFromPage: addLinksFromPage
 }
