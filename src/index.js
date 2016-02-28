@@ -5,6 +5,7 @@ import Download from './download.js';
 import md5 from 'md5';
 import fsp from 'fs-promise';
 import emitter from 'event-emitter'; 
+import winston from 'winston';
 
 //Data Structures
 let downloadsMap = new Map();       // md5(url) => Download
@@ -335,3 +336,33 @@ module.exports = {
     restart: restart,
     addLinksFromPage: addLinksFromPage
 }
+
+/*
+|--------------------------------------------------------------------------
+| CLI Helpers
+|--------------------------------------------------------------------------
+|   
+|   
+|   
+*/
+
+
+winston.loggers.add('logger', {
+    console: {
+      level: 'silly',
+      colorize: 'true',
+      prettyPrint: true,
+      label: '',
+      showLevel : true
+    }
+  });
+console.log = winston.loggers.get('logger').info;
+
+
+
+let dwn = new Download('http://google.com');
+// console.log(download.toJSON());
+dwn.start()
+    .then((res) => res.writeContents('./data/'))
+    .then(() => console.log(dwn.message))
+    .catch(console.log);

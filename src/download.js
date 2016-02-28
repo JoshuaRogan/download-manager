@@ -5,7 +5,6 @@ import basicrequest from 'request';
 import torrequest from 'torrequest';
 import fsp from 'fs-promise';
 import winston from 'winston';
-import util from 'util'; 
 
 function Download(url){
     Download.prototype.count++;
@@ -219,45 +218,5 @@ Object.defineProperty(Download.prototype, 'filename', {
 |   
 */
 
-winston.loggers.add('logger', {
-    console: {
-      level: 'silly',
-      colorize: 'true',
-      prettyPrint: true,
-      label: '',
-      showLevel : true
-    }
-  });
-let logger = winston.loggers.get('logger');
-
-
-
-let download = new Download('http://google.com');
-// console.log(download.toJSON());
-download.start()
-    .then((download) => download.writeContents('./data/'))
-    .then(logger.info)
-//     .catch(winston.log);
-// console.log(download.toJSON());
-// winston.log('info', 'Hello distributed log files!');
-    // winston.loggers.default.colorize = true; 
-
-
-    // winston.level = 'debug';
-    // let test = {hello: 'world', obj: true}; 
-    // category1.log(test,test);
-    // // category1.debug(test, test);
-    // logger.info('Log Message', download);
-    // winston.loggers.default.transports[0].colorize = true; 
-    // winston.loggers.default.transports[0].prettyPrint = true; 
-    // winston.loggers.options.prettyPrint = true; 
-    // logger.info(winston.loggers.default.transports[0]);
-
-    // console.log(util.inspect(test, {colors: true}))
-    // console.log(util.inspect(test, {colors: true}))
-    // console.log(util.inspect(winston, {colors: true}))
-    // winston.info(winston.loggers.transports);
-    // logger.info('hello', download);
-    // logger.info(winston.loggers);
 
 module.exports = Download;
