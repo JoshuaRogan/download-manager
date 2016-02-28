@@ -31,7 +31,8 @@
     "md5": "^2.0.0",
     "promise": "^7.1.1",
     "request": "^2.67.0",
-    "torrequest": "0.0.2"
+    "torrequest": "0.0.2",
+    "winston": "^2.2.0"
   },
   "devDependencies": {
     "babel-cli": "^6.4.0",

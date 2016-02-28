@@ -4,20 +4,19 @@ import md5 from 'md5';
 import basicrequest from 'request';
 import torrequest from 'torrequest';
 import fsp from 'fs-promise';
+import winston from 'winston';
+import util from 'util'; 
 
 function Download(url){
     Download.prototype.count++;
 
     this.url = url;
-    this.urlHash = md5(this.url);
-
-    //Status 
+    this.urlHash = md5(this.url); 
     this.downloaded = false;
     this.downloading = false; 
     this.attempts = 0;
     this.wait = false;
     this.failed = false;
-
 }
 
 Download.prototype.createFromJSON = function(jsonObj){
@@ -113,9 +112,8 @@ Download.prototype.start = function(){
             this.attempts++;
             this.downloading = true;
             this.startedAt = new Date().getTime();
-            // let config = Object.assign 
-
             this.request({uri: this.url}, (err, response, contents) => {
+
                 if(!err){
                     this.finishedAt = new Date().getTime();
                     this.success = true;
@@ -123,9 +121,7 @@ Download.prototype.start = function(){
                     this.downloaded = true; 
                     this.fileContents = contents;   
                     this.response = response; 
-
                     this.message = 'Completed successfully';
-
                     resolve(this); 
                 }
                 else{
@@ -134,7 +130,6 @@ Download.prototype.start = function(){
                     this.wait = true;
                     this.message = `${this.url} request failed.`;
                     this.error = err; 
-
                     reject(this);
                 }
             });
@@ -152,7 +147,7 @@ Download.prototype.writeContents = function(destination = this.destination){
         else{
             let fileLocation = destination + this.filename; 
             fsp.writeFile(fileLocation, this.fileContents)
-                .then(()=>{
+                .then(() => {
                     this.writtenToFile = true;
                     this.fileLocation = fileLocation;
                     this.message = `Successfull write of ${this.url} to ${fileLocation}`;
@@ -223,12 +218,46 @@ Object.defineProperty(Download.prototype, 'filename', {
 |   
 |   
 */
+
+winston.loggers.add('logger', {
+    console: {
+      level: 'silly',
+      colorize: 'true',
+      prettyPrint: true,
+      label: '',
+      showLevel : true
+    }
+  });
+let logger = winston.loggers.get('logger');
+
+
+
 let download = new Download('http://google.com');
-console.log(download.toJSON());
-download.start()
-    .then((download) => download.writeContents('./'))
-    .then((download) => console.log(download.toJSON()))
-    .catch(console.log);
 // console.log(download.toJSON());
+download.start()
+    .then((download) => download.writeContents('./data/'))
+    .then(logger.info)
+//     .catch(winston.log);
+// console.log(download.toJSON());
+// winston.log('info', 'Hello distributed log files!');
+    // winston.loggers.default.colorize = true; 
+
+
+    // winston.level = 'debug';
+    // let test = {hello: 'world', obj: true}; 
+    // category1.log(test,test);
+    // // category1.debug(test, test);
+    // logger.info('Log Message', download);
+    // winston.loggers.default.transports[0].colorize = true; 
+    // winston.loggers.default.transports[0].prettyPrint = true; 
+    // winston.loggers.options.prettyPrint = true; 
+    // logger.info(winston.loggers.default.transports[0]);
+
+    // console.log(util.inspect(test, {colors: true}))
+    // console.log(util.inspect(test, {colors: true}))
+    // console.log(util.inspect(winston, {colors: true}))
+    // winston.info(winston.loggers.transports);
+    // logger.info('hello', download);
+    // logger.info(winston.loggers);
 
 module.exports = Download;
