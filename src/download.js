@@ -47,6 +47,8 @@ Download.prototype.toJSON = function(){
 |   
 |   
 */
+Download.prototype.debug = false;
+
 Download.prototype.count = 0;
 Download.prototype.maxAttemps = 10;
 Download.prototype.destination = './downloaded/';
@@ -118,9 +120,14 @@ Download.prototype.start = function(){
                     this.success = true;
                     this.downloading = false; 
                     this.downloaded = true; 
-                    this.fileContents = contents;   
-                    this.response = response; 
                     this.message = 'Completed successfully';
+                    this.fileContentsHash = md5(contents);
+                    this.fileContents = contents;
+                    
+
+                    if(this.debug){       
+                        this.response = response; 
+                    }
                     resolve(this); 
                 }
                 else{
@@ -144,11 +151,16 @@ Download.prototype.writeContents = function(destination = this.destination){
             reject(this);
         }
         else{
-            let fileLocation = destination + this.filename; 
+            let fileLocation = destination + this.filename + '-' + this.fileContentsHash; 
+
             fsp.writeFile(fileLocation, this.fileContents)
                 .then(() => {
                     this.writtenToFile = true;
                     this.fileLocation = fileLocation;
+                    if(!this.debug) {
+                        this.fileContents = null;
+                        delete this.fileContents;
+                    }
                     this.message = `Successfull write of ${this.url} to ${fileLocation}`;
                     resolve(this); 
                 })

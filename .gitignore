@@ -3,3 +3,4 @@ lib/
 _*
 ENV
 data/
+node-downloader.json

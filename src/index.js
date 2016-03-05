@@ -1,41 +1,53 @@
 "use strict";
 import "babel-polyfill";
-
+import winston from 'winston';
 import Download from './download.js';
 import md5 from 'md5';
 import fsp from 'fs-promise';
 import emitter from 'event-emitter'; 
-import winston from 'winston';
+import util from 'util'; 
 
 //Data Structures
-let downloadsMap = new Map();       // md5(url) => Download
-let avaiableQueue = [];             // Queue of md5(urls) of the next url to try to download
+let downloadsMap = new Map();           // md5(url) => Download
+let avaiableQueue = [];                 // Queue of md5(urls) of the next url to try to download
 
-let active = new Set();             // Active download keys
-let finished = new Set();           // Finished download keys
-let failed = new Set();             // Failed download keys
-let addingMore = false;             // Adding more from another source
+let active = new Set();                 // Active download keys
+let finished = new Set();               // Finished download keys
+let failed = new Set();                 // Failed download keys
 
-let moreUpdates = false;            // More updates to the json file requested
-let activeUpdate = false;           // Update in progress
+//Status
+let activeUpdate = false;               // JSON file update in progress
+let needBreak = false;                  // Need to pause
+let takingBreak = false;                // Actively pausing
+let breakInterval = false;              // Break Interval ID
+let isThrottling = false;               // Actively Throttling
+let moreUpdates = false;                // Flag if there are more JSON update requests 
 
-//Status 
-let takeBreak = false;              
+//Logging Helpers
+winston.loggers.add('logger', {
+    console: {
+      level: 'silly',
+      colorize: true,
+      prettyPrint: true,
+      label: '',
+      showLevel : true
+    }
+  });
+console.info = winston.loggers.get('logger').info;
 
-let config = {
-    JSONFileDir: './',                              
-    JSONFileDir: 'downloadmanager.json',                              
+let config = {                          
+    JSONFile: 'node-downloader.json',                              
     backupDir: './_node-downloader/backups/',    
     downloadsDir: './_node-downloader/pages/',             
     maxAttempts: 10,
     maxConcurrentRequests: 50,
     throttle: 500,
-    breaks: false,
+    breaks: true,
     breakInterval: 1000,                      
     breakTime: 1000,                          
     useTor: false,
     updateAll: false,
-    immediateWrite: false,                               
+    writeContents: true,                               
     requestConfig:{
         timeout: 30000              
     },
@@ -60,24 +72,26 @@ let linksConfig = {
 | Public API
 |--------------------------------------------------------------------------
 |   - download()
-|   - restart()
-|   
+|   - clean()
+|   - addLinksFromPage()
+|   - setConfig()
 */
 
 /**
- * Initalize 
- * @return {[type]} [description]
+ * Fire off some downloads 
+ * 
  */
-function download(){
-    init(); 
-    startBreakTimer()
+function download(urls, options = false){
+    if(options !== false) setConfig(options);
+    add(urls); 
+    startBreakTimer();
 }
 
 /**
  * Don't continue downloading where it was left off
  * @return {[type]} [description]
  */
-function restart(){
+function clean(){
 
 }
 
@@ -89,86 +103,142 @@ function restart(){
  * @param {[type]} url [description]
  */
 function addLinksFromPage(url, config = {}){
-    addingMore = true; 
-    addingMore = false; 
+
 }
 
+/**
+ * Set the config for this download module
+ * @param {Object} config 
+ */
+function setConfig(options){
+    Object.assign(config, options);   
+}
 
 /*
 |--------------------------------------------------------------------------
 | Setup
 |--------------------------------------------------------------------------
-|   - init()
+|   
 |   
 |   
 */
+
 /**
- * Setup Inital properties and data structures 
+ * Add urls to this module  
  * @return {[type]} [description]
  */
-function init(){
-    //Setup the downloads
-    
-    //Setup static vars 
+function add(urls){
+    if(Array.isArray(urls)){
+        addDownloadsFromArray(urls);
+    }
+    else{
+        if(urls.contains('.json')){
+            addDownloadsFromJSON(urls);
+        }
+        else{
+            addDownloadFromString(urls);
+        }
+    }
+
 }
 
+function addDownloadsFromArray(urls){
+    for(let url of urls){
+        addDownloadFromUrl(url);
+    }
+}
+
+function addDownloadsFromJSON(filename){
+}
+
+function addDownloadFromString(url){
+    addDownloadFromUrl(url);
+}
+
+function addDownloadFromUrl(url){
+    let key = md5(url); 
+    if(!downloadsMap.has(key)){
+        let dwn = new Download(url);
+        avaiableQueue.push(key);
+        downloadsMap.set(key, dwn);
+        triggerMore();
+    }     
+}
+
+function addDownloadFromJSON(obj){
+
+}
 
 /*
 |--------------------------------------------------------------------------
-| Intenral API
+| Internal API
 |--------------------------------------------------------------------------
 | 
 |   
 |   
 */
 function triggerNext(){
-    if(avaiableQueue.length){
-        let key = avaiableQueue.shift();
-        active.set(key); 
-        startDownload();
+    let key = getNextKey();
+    if(key !== false){ 
+        startDownload(key);
     }
 }
 
+
+function getNextKey(){
+    while(avaiableQueue.length){
+        let key = avaiableQueue.shift();
+        if(!finished.has(key) && !failed.has(key) && !active.has(key)){
+            return key;
+        }
+    }
+    return false; 
+}
+
 /**
- * Fire off upto maxconcurrent requests 
- * 
+ * Fire more available requests up-to maxConcurrentRequests  
  * 
  */
 function triggerMore(){
-    let max = config.maxConcurrentRequests > avaiableQueue ? avaiableQueue : config.maxConcurrentRequests;
-    for(let i=active.length; i < max; i++){
-        triggerNext();
+    if(!allCompleted()){
+        let max = config.maxConcurrentRequests > avaiableQueue ? avaiableQueue : config.maxConcurrentRequests;
+        for(let i=active.size; i < max; i++){
+            triggerNext();
+        }
     }
 }
 
 /**
- * Handle accepted promises
- * @param  {Download} download Accepted download object
+ * Handle accepted promises.
  * 
+ * @param  {Download} download Accepted download object
  */
-function downloadAccepted(download){
-    active.delete(download.urlHash);
-    finished.set(download.urlHash);
-    triggerMore(); 
+function downloadAccepted(dwn){
+    console.info(`Download "${dwn.url}" has been accepted. Message: "${dwn.message}".`);
+
+    active.delete(dwn.urlHash);
+    finished.add(dwn.urlHash);
+
+    if(config.writeContents){
+        dwn.writeContents(config.downloadsDir)
+        .then(() => console.info(`Write completed. Message: "${dwn.message}".`))
+        .catch(() => console.info(`Write failed. Message: "${dwn.message}".`));
+    }
+
 }
 
 /**
- * Hanlde Download failed to finish. If the status is failed it won't be 
+ * Handle Download failed to finish. If the status is failed it won't be 
  * attempted again. Otherwise add it back to the queue for try again later.
  * 
  * @param  {Download} download the download that reject
  */
-function downloadRejected(download){
-    active.delete(download.urlHash);
+function downloadRejected(dwn){
+    console.info(`Download "${dwn.url}" has been rejected. Message: "${dwn.message}".`); 
 
-    if(download.failed === true){
-        failed.set(download.urlHash);
-    }
-    else{
-        avaiableQueue.push(download.urlHash);
-    }
-
-    triggerMore();
+    active.delete(dwn.urlHash);
+    if(dwn.failed === true) failed.add(dwn.urlHash);
+    else avaiableQueue.push(dwn.urlHash);
 }
 
 
@@ -178,14 +248,18 @@ function downloadRejected(download){
  * @return Promise
  */
 function startDownload(key){
-    let download = downloadsMap.get(key);
-    downloadsStart++;
-
-    return 
-         throttle()
-        .then(takeBreak)
-        .then(download.start)
-        .then(downloadAccepted, downloadRejected); 
+    let dwn = downloadsMap.get(key);
+    active.add(key);
+    
+    return throttle()
+        .then(() => takeBreak())
+        .then(() => dwn.start())
+        .then(() => downloadAccepted(dwn), () => downloadRejected(dwn))
+        .then(() => {
+            triggerMore();
+            updateJSON();
+        })
+        .catch(console.log);
 }
 
 
@@ -195,7 +269,7 @@ function startDownload(key){
 |--------------------------------------------------------------------------
 | Helpers
 |--------------------------------------------------------------------------
-|   - init()
+|   
 |   
 |   
 */
@@ -205,9 +279,9 @@ function startDownload(key){
  * 
  */
 function startBreakTimer(){
-    if(config.break){
-        setInterval(() =>{
-            takeBreak = true; 
+    if(config.breaks){
+        breakInterval = setInterval(() =>{
+            needBreak = true; 
         }, config.breakInterval)
     }
 }
@@ -219,11 +293,17 @@ function startBreakTimer(){
  */
 function throttle(){
     return new Promise((resolve, reject) => {
-        if(!config.throttle || config.throttle === 0){
-            resolve(); 
+        if(isThrottling || !config.throttle || config.throttle === 0){
+            resolve('No Throttling'); 
         }
-
-        setTimeout(resolve, config.throttle); 
+        else{
+            isThrottling = true;
+            setTimeout(()=>{
+                isThrottling = false;
+                resolve('Finished Throttling');
+            }, config.throttle);
+        }
+         
     });
 }
 
@@ -234,34 +314,37 @@ function throttle(){
  */
 function takeBreak(){
     return new Promise((resolve, reject) => {
-        if(!takeBreak || !config.break || config.breakTime === 0){
-            resolve(); 
+        if(takingBreak || !needBreak || config.breakTime === 0){
+            resolve('No Break'); 
         }
-        takeBreak = false; 
-        setTimeout(resolve, config.breakTime); 
+        else{
+            console.info('Taking a break for' + config.breakTime);
+            needBreak = false; 
+            takingBreak = true; 
+            setTimeout(() => {
+                takingBreak = false; 
+                needBreak = false;
+                resolve('Break Finished');
+            }, config.breakTime); 
+        }
+        
     });
 }
 
-/**
- * Save the contents of a finished download.
- * 
- * @param  {String} key md5 of the url
- * @return {Promise}    
- */
-function writeContents(key){
-    let download = downloadsMap.get(key);
-    return download.writeContents(); 
-}
 
 /**
  * Update this JSON file.
- *   
- * @return {Promise}    
+ *      
  */
 function updateJSON(){
     if(!activeUpdate){
         activeUpdate = true; 
-        fsp.writeFile('filename.json', json)
+        let json = {
+            config: config,
+            downloads: Array.from(downloadsMap.values())
+        };
+
+        fsp.writeFile(config.JSONFile, JSON.stringify(json))
             .then(() => {
                 activeUpdate = false; 
                 if(moreUpdates) {
@@ -276,21 +359,17 @@ function updateJSON(){
 }
 
 /**
- * Should we download this key
- * @param  {String} key to match
- * @return {Boolean} 
- */
-function shouldDownload(key){
-    return availableSet.has(key);
-}
-
-
-/**
  * More downloads not finished or failed avaiable. 
  * @return {Boolean} 
  */
-function hasMore(){
-    return !addingMore && activeQueue.length > 0 && finished.length + failed.length < downloadsMap.length;
+function allCompleted(){
+    if(finished.size + failed.size === downloadsMap.size){
+        onAllFinished();
+        return true; 
+    }
+    else{
+        return false; 
+    }
 }
 
 /*
@@ -319,27 +398,32 @@ function newError(){}
 |--------------------------------------------------------------------------
 | Events
 |--------------------------------------------------------------------------
-|   
+|  - Use Event Emitter 
 |   
 |   
 */
-function onDownloadStart(){}
-function onDownloadFinished(){}
-function onDonloadFailed(){}
-function onRejected(){}
+
+function onDownloadFinished(dwn){
+    // dwn.writeContents(config.downloadsDir);
+}
+
+function onAllFinished(){
+    if(breakInterval) clearInterval(breakInterval);
+}
 
 
 
 //Exposed API
 module.exports = {
     download: download,
-    restart: restart,
-    addLinksFromPage: addLinksFromPage
+    clean: clean,
+    addLinksFromPage: addLinksFromPage,
+    setConfig: setConfig
 }
 
 /*
 |--------------------------------------------------------------------------
-| CLI Helpers
+| Testing
 |--------------------------------------------------------------------------
 |   
 |   
@@ -347,22 +431,13 @@ module.exports = {
 */
 
 
-winston.loggers.add('logger', {
-    console: {
-      level: 'silly',
-      colorize: 'true',
-      prettyPrint: true,
-      label: '',
-      showLevel : true
-    }
-  });
-console.log = winston.loggers.get('logger').info;
 
+download(['http://google.com', 'http://amazon.com'], {downloadsDir: './data/pages/'});
+// console.info(downloadsMap);
 
-
-let dwn = new Download('http://google.com');
+// let dwn = new Download('http://google.com');
 // console.log(download.toJSON());
-dwn.start()
-    .then((res) => res.writeContents('./data/'))
-    .then(() => console.log(dwn.message))
-    .catch(console.log);
+// dwn.start()
+//     .then((res) => res.writeContents('./data/'))
+//     .then(() => console.log(dwn.message))
+//     .catch(console.log);
